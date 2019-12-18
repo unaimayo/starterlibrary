@@ -20,8 +20,13 @@
 #########################################################
 # Define the Azure provider
 #########################################################
-provider "azurerm" {
-  version = "~> 0.2.2"
+provider "azurerm" { }
+
+#########################################################
+# Helper module for tagging
+#########################################################
+module "camtags" {
+  source = "../Modules/camtags"
 }
 
 #########################################################
@@ -62,33 +67,36 @@ resource "random_id" "default" {
 resource "azurerm_resource_group" "default" {
   name     = "${var.name_prefix}-${random_id.default.hex}-rg"
   location = "${var.azure_region}"
+  tags     = "${module.camtags.tagsmap}"
 }
 
 resource "azurerm_virtual_network" "default" {
-  name                = "${var.name_prefix}-vnet"
+  name                = "${var.name_prefix}-${random_id.default.hex}-vnet"
   address_space       = ["10.0.0.0/16"]
   location            = "${var.azure_region}"
   resource_group_name = "${azurerm_resource_group.default.name}"
 }
 
 resource "azurerm_subnet" "web" {
-  name                 = "${var.name_prefix}-subnet-web"
+  name                 = "${var.name_prefix}-subnet-${random_id.default.hex}-web"
   resource_group_name  = "${azurerm_resource_group.default.name}"
   virtual_network_name = "${azurerm_virtual_network.default.name}"
   address_prefix       = "10.0.1.0/24"
 }
 
 resource "azurerm_public_ip" "web" {
-  name                         = "${var.name_prefix}-web-pip"
+  name                         = "${var.name_prefix}-${random_id.default.hex}-web-pip"
   location                     = "${var.azure_region}"
   resource_group_name          = "${azurerm_resource_group.default.name}"
-  public_ip_address_allocation = "static"
+  allocation_method 		   = "Static"
+  tags                         = "${module.camtags.tagsmap}"
 }
 
 resource "azurerm_network_security_group" "web" {
-  name                = "${var.name_prefix}-web-nsg"
+  name                = "${var.name_prefix}-${random_id.default.hex}-web-nsg"
   location            = "${var.azure_region}"
   resource_group_name = "${azurerm_resource_group.default.name}"
+  tags                = "${module.camtags.tagsmap}"
 
   security_rule {
     name                       = "ssh-allow"
@@ -116,13 +124,14 @@ resource "azurerm_network_security_group" "web" {
 }
 
 resource "azurerm_network_interface" "web" {
-  name                      = "${var.name_prefix}-web-nic1"
+  name                      = "${var.name_prefix}-${random_id.default.hex}-web-nic1"
   location                  = "${var.azure_region}"
   resource_group_name       = "${azurerm_resource_group.default.name}"
   network_security_group_id = "${azurerm_network_security_group.web.id}"
+  tags                      = "${module.camtags.tagsmap}"
 
   ip_configuration {
-    name                          = "${var.name_prefix}-web-nic1-ipc"
+    name                          = "${var.name_prefix}-${random_id.default.hex}-web-nic1-ipc"
     subnet_id                     = "${azurerm_subnet.web.id}"
     private_ip_address_allocation = "dynamic"
     public_ip_address_id          = "${azurerm_public_ip.web.id}"
@@ -133,10 +142,14 @@ resource "azurerm_network_interface" "web" {
 # Deploy the storage resources
 #########################################################
 resource "azurerm_storage_account" "default" {
-  name                = "${format("st%s",random_id.default.hex)}"
-  resource_group_name = "${azurerm_resource_group.default.name}"
-  location            = "${var.azure_region}"
-  account_type        = "Standard_LRS"
+  name                		= "${format("st%s",random_id.default.hex)}"
+  resource_group_name 		= "${azurerm_resource_group.default.name}"
+  location            		= "${var.azure_region}"
+  account_tier        		= "Standard"  
+  account_replication_type  = "LRS"
+  
+  tags                = "${module.camtags.tagsmap}"
+  
 }
 
 resource "azurerm_storage_container" "default" {
@@ -151,11 +164,12 @@ resource "azurerm_storage_container" "default" {
 #########################################################
 resource "azurerm_virtual_machine" "web" {
   count                 = "${var.user_public_key != "None" ? 1 : 0}"
-  name                  = "${var.name_prefix}-web-vm"
+  name                  = "${var.name_prefix}-web-${random_id.default.hex}-vm"
   location              = "${var.azure_region}"
   resource_group_name   = "${azurerm_resource_group.default.name}"
   network_interface_ids = ["${azurerm_network_interface.web.id}"]
   vm_size               = "Standard_A2"
+  tags                  = "${module.camtags.tagsmap}"
 
   storage_image_reference {
     publisher = "Canonical"
@@ -165,14 +179,14 @@ resource "azurerm_virtual_machine" "web" {
   }
 
   storage_os_disk {
-    name          = "${var.name_prefix}-web-os-disk1"
-    vhd_uri       = "${azurerm_storage_account.default.primary_blob_endpoint}${azurerm_storage_container.default.name}/${var.name_prefix}-web-os-disk1.vhd"
+    name          = "${var.name_prefix}-${random_id.default.hex}-web-os-disk1"
+    vhd_uri       = "${azurerm_storage_account.default.primary_blob_endpoint}${azurerm_storage_container.default.name}/${var.name_prefix}-${random_id.default.hex}-web-os-disk1.vhd"
     caching       = "ReadWrite"
     create_option = "FromImage"
   }
 
   os_profile {
-    computer_name  = "${var.name_prefix}-web"
+    computer_name  = "${var.name_prefix}-${random_id.default.hex}-web"
     admin_username = "${var.admin_user}"
     admin_password = "${var.admin_user_password}"
   }
@@ -189,11 +203,12 @@ resource "azurerm_virtual_machine" "web" {
 
 resource "azurerm_virtual_machine" "web-alternative" {
   count                 = "${var.user_public_key == "None" ? 1 : 0}"
-  name                  = "${var.name_prefix}-web-vm"
+  name                  = "${var.name_prefix}-${random_id.default.hex}-web-vm"
   location              = "${var.azure_region}"
   resource_group_name   = "${azurerm_resource_group.default.name}"
   network_interface_ids = ["${azurerm_network_interface.web.id}"]
   vm_size               = "Standard_A2"
+  tags                  = "${module.camtags.tagsmap}"
 
   storage_image_reference {
     publisher = "Canonical"
@@ -203,14 +218,14 @@ resource "azurerm_virtual_machine" "web-alternative" {
   }
 
   storage_os_disk {
-    name          = "${var.name_prefix}-web-os-disk1"
-    vhd_uri       = "${azurerm_storage_account.default.primary_blob_endpoint}${azurerm_storage_container.default.name}/${var.name_prefix}-web-os-disk1.vhd"
+    name          = "${var.name_prefix}-${random_id.default.hex}-web-os-disk1"
+    vhd_uri       = "${azurerm_storage_account.default.primary_blob_endpoint}${azurerm_storage_container.default.name}/${var.name_prefix}-${random_id.default.hex}-web-os-disk1.vhd"
     caching       = "ReadWrite"
     create_option = "FromImage"
   }
 
   os_profile {
-    computer_name  = "${var.name_prefix}-web"
+    computer_name  = "${var.name_prefix}-${random_id.default.hex}-web"
     admin_username = "${var.admin_user}"
     admin_password = "${var.admin_user_password}"
   }
@@ -224,19 +239,21 @@ resource "azurerm_virtual_machine" "web-alternative" {
 # Deploy the SQL resource
 #########################################################
 resource "azurerm_sql_server" "db" {
-  name                         = "${var.name_prefix}-sqlserver"
+  name                         = "${var.name_prefix}-${random_id.default.hex}-sqlserver"
   resource_group_name          = "${azurerm_resource_group.default.name}"
   location                     = "${var.azure_region}"
   version                      = "12.0"
   administrator_login          = "${var.admin_user}"
   administrator_login_password = "${var.admin_user_password}"
+  tags                         = "${module.camtags.tagsmap}"
 }
 
 resource "azurerm_sql_database" "db" {
-  name                = "${var.name_prefix}-database"
+  name                = "${var.name_prefix}-${random_id.default.hex}-database"
   resource_group_name = "${azurerm_resource_group.default.name}"
   location            = "${var.azure_region}"
   server_name         = "${azurerm_sql_server.db.name}"
+  tags                = "${module.camtags.tagsmap}"
 }
 
 resource "azurerm_sql_firewall_rule" "db" {
@@ -340,13 +357,13 @@ echo "---install ODBC drive and SQL tools---" | tee -a $LOGFILE 2>&1
 curl -s https://packages.microsoft.com/config/ubuntu/16.04/prod.list | tee /etc/apt/sources.list.d/mssql-tools.list    >> $LOGFILE 2>&1 || { echo "---Failed to update repo---" | tee -a $LOGFILE; exit 1; }
 apt-get update                                                                                                         >> $LOGFILE 2>&1 || true
 ACCEPT_EULA=Y apt-get install mssql-tools -y --allow-unauthenticated                                              >> $LOGFILE 2>&1 || { echo "---Failed to install mssql tools---" | tee -a $LOGFILE; exit 1; }
-apt-get install unixodbc-dev -y                                                                                        >> $LOGFILE 2>&1 || { echo "---Failed to install ODBC drive---" | tee -a $LOGFILE; exit 1; }
+apt-get install unixodbc-dev -y --allow-unauthenticated                                                                                       >> $LOGFILE 2>&1 || { echo "---Failed to install ODBC drive---" | tee -a $LOGFILE; exit 1; }
 echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
 echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
 source ~/.bashrc
 
 echo "---install php driver for SQL server---" | tee -a $LOGFILE 2>&1
-pecl install sqlsrv pdo_sqlsrv                                                                                         >> $LOGFILE 2>&1 || { echo "---Failed to install php drivers---" | tee -a $LOGFILE; exit 1; }
+pecl install sqlsrv-5.3.0 pdo_sqlsrv-5.3.0                                                                                         >> $LOGFILE 2>&1 || { echo "---Failed to install php drivers---" | tee -a $LOGFILE; exit 1; }
 PHP_INI=/etc/php/7.0/apache2/php.ini
 echo "extension= pdo_sqlsrv.so" | tee -a $PHP_INI                                                                      >> $LOGFILE 2>&1 || { echo "---Failed to update php_ini---" | tee -a $LOGFILE; exit 1; }
 echo "extension= sqlsrv.so" | tee -a $PHP_INI                                                                          >> $LOGFILE 2>&1 || { echo "---Failed to update php_ini---" | tee -a $LOGFILE; exit 1; }
@@ -398,18 +415,18 @@ EOF
 #########################################################
 # Output
 #########################################################
-output "LAMP Web VM Public IP" {
+output "lamp_web_vm_public_ip" {
   value = "${azurerm_public_ip.web.ip_address}"
 }
 
-output "LAMP Web VM Private IP" {
+output "lamp_web_vm_private_ip" {
   value = "${azurerm_network_interface.web.private_ip_address}"
 }
 
-output "LAMP SQL Service FQDN" {
+output "lamp_sql_service_fqdn" {
   value = "${azurerm_sql_server.db.fully_qualified_domain_name}"
 }
 
-output "Please Verify LAMP Installation" {
+output "application_url" {
   value = "http://${azurerm_public_ip.web.ip_address}/test.php"
 }

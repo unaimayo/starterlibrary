@@ -26,6 +26,13 @@ provider "ibm" {
 }
 
 #########################################################
+# Helper module for tagging
+#########################################################
+module "camtags" {
+  source = "../Modules/camtags"
+}
+
+#########################################################
 # Define the variables
 #########################################################
 variable "datacenter" {
@@ -93,6 +100,7 @@ resource "ibm_compute_vm_instance" "mongodb_vm" {
   dedicated_acct_host_only = false
   local_disk               = false
   ssh_key_ids              = ["${ibm_compute_ssh_key.cam_public_key.id}", "${ibm_compute_ssh_key.temp_public_key.id}"]
+  tags                     = ["${module.camtags.tagslist}"]
 
   # Specify the ssh connection
   connection {
@@ -176,6 +184,7 @@ resource "ibm_compute_vm_instance" "strongloop_vm" {
   dedicated_acct_host_only = false
   local_disk               = false
   ssh_key_ids              = ["${ibm_compute_ssh_key.cam_public_key.id}", "${ibm_compute_ssh_key.temp_public_key.id}"]
+  tags                     = ["${module.camtags.tagslist}"]
 }
 
 ##############################################################
@@ -195,6 +204,7 @@ resource "ibm_compute_vm_instance" "angularjs_vm" {
   dedicated_acct_host_only = false
   local_disk               = false
   ssh_key_ids              = ["${ibm_compute_ssh_key.cam_public_key.id}", "${ibm_compute_ssh_key.temp_public_key.id}"]
+  tags                     = ["${module.camtags.tagslist}"]
 }
 
 ##############################################################
@@ -410,9 +420,19 @@ echo "---finish installing node.js---" | tee -a $LOGFILE 2>&1
 
 echo "---start installing angularjs---" | tee -a $LOGFILE 2>&1
 npm install -g grunt-cli bower yo generator-karma generator-angular        >> $LOGFILE 2>&1 || { echo "---Failed to install angular tools---" | tee -a $LOGFILE; exit 1; }
-yum install gcc ruby ruby-devel rubygems make -y                           >> $LOGFILE 2>&1 || { echo "---Failed to install ruby---" | tee -a $LOGFILE; exit 1; }
+#yum install gcc ruby ruby-devel rubygems make -y                           >> $LOGFILE 2>&1 || { echo "---Failed to install ruby---" | tee -a $LOGFILE; exit 1; }
+echo "---start installing ruby pre-reqs---" | tee -a $LOGFILE 2>&1
+yum install curl gpg gcc gcc-c++ make patch autoconf automake bison libffi-devel libtool patch readline-devel sqlite-devel zlib-devel openssl-devel gdbm -y >> $LOGFILE 2>&1 || { echo "---Failed to install ruby pre-reqs---" | tee -a $LOGFILE; exit 1; }
+echo "---Download, make and install ruby 2.2.10---" | tee -a $LOGFILE 2>&1
+wget https://cache.ruby-lang.org/pub/ruby/2.2/ruby-2.2.10.tar.gz
+tar -zxvf ruby-2.2.10.tar.gz
+cd ruby-2.2.10
+./configure																		   >> $LOGFILE 2>&1 || { echo "---Failed to install node.js---"| tee -a $LOGFILE; exit 1; }
+make																			   >> $LOGFILE 2>&1 || { echo "---Failed to install node.js---"| tee -a $LOGFILE; exit 1; }
+sudo make install																   >> $LOGFILE 2>&1 || { echo "---Failed to install node.js---"| tee -a $LOGFILE; exit 1; }
+echo "---start installing compass---" | tee -a $LOGFILE 2>&1
 gem install compass                                                        >> $LOGFILE 2>&1 || { echo "---Failed to install compass---" | tee -a $LOGFILE; exit 1; }
-echo "---finish installing angularjs---" | tee -a $LOGFILE 2>&1
+echo "---finish installing compass and angularjs---" | tee -a $LOGFILE 2>&1
 
 #install sample application
 
@@ -766,18 +786,18 @@ EOF
 #########################################################
 # Output
 #########################################################
-output "The mongodb server's ip addresses" {
+output "db_server_ip_address" {
   value = "${ibm_compute_vm_instance.mongodb_vm.ipv4_address}"
 }
 
-output "The strongloop server's ip addresses" {
+output "strongloop_server_ip_address" {
   value = "${ibm_compute_vm_instance.strongloop_vm.ipv4_address}"
 }
 
-output "The angular server's ip addresses" {
+output "angularjs_server_ip_address" {
   value = "${ibm_compute_vm_instance.angularjs_vm.ipv4_address}"
 }
 
-output "Please access the strongloop-three-tiers sample application using the following url" {
+output "application_url" {
   value = "http://${ibm_compute_vm_instance.angularjs_vm.ipv4_address}:8080"
 }

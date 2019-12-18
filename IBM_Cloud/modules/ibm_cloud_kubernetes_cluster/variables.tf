@@ -43,3 +43,15 @@ variable "subnet_id" {
 variable "num_workers" {
   description = "The number of workers to be deployed in the cluster."
 }
+
+variable "resource_group_name" {
+  type = "string"
+  description = " The name of the IBM Cloud resource group."
+  default = "default"
+}
+
+variable "kube_version" {
+  type = "string"
+  description = "Kubernetes version for the cluster."
+  default = "1.11.6"
+}

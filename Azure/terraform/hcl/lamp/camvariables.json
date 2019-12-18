@@ -158,5 +158,35 @@
       "secured": false,
       "required": false
     }
+  ],
+  "template_output_params": [
+    {
+      "name": "lamp_web_vm_public_ip",
+      "type": "string",
+      "label": "Web VM Public IP",
+      "secured": false,
+      "hidden": false
+    },      
+    {
+      "name": "lamp_web_vm_private_ip",
+      "type": "string",
+      "label": "Web VM Private IP",
+      "secured": false,
+      "hidden": false
+    },      
+    {
+      "name": "lamp_sql_service_fqdn",
+      "type": "string",
+      "label": "SQL Service FQDN",
+      "secured": false,
+      "hidden": false
+    },  
+    {
+      "name": "application_url",
+      "type": "url",
+      "label": "Sample Application URL",
+      "secured": false,
+      "hidden": false
+    }  
   ]
 }
